@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dollar Cost Averaging</title>
+    <script src="https://cdn.plot.ly/plotly-1.8.0.min.js"></script>
+</head>
+
+<body>
+    <div id="graph"></div>
+</body>
+
+<script src="./env.js"></script>
+<script>
+    var graphDiv = document.getElementById('graph');
+
+    var rawDataURL = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol=SPY&apikey=${API_KEY}&datatype=csv`;
+
+    var selectorOptions = {
+        buttons: [{
+            step: 'month',
+            stepmode: 'backward',
+            count: 1,
+            label: '1m'
+        }, {
+            step: 'month',
+            stepmode: 'backward',
+            count: 6,
+            label: '6m'
+        }, {
+            step: 'year',
+            stepmode: 'todate',
+            count: 1,
+            label: 'YTD'
+        }, {
+            step: 'year',
+            stepmode: 'backward',
+            count: 1,
+            label: '1y'
+        }, {
+            step: 'all',
+        }],
+    };
+
+    Plotly.d3.csv(rawDataURL, function (err, rawData) {
+        if (err) throw err;
+
+        var data = prepData(rawData);
+        var layout = {
+            title: 'Dollar cost averaging',
+            xaxis: {
+                rangeselector: selectorOptions,
+                rangeslider: {}
+            },
+            yaxis: {
+                fixedrange: true
+            }
+        };
+
+        Plotly.plot(graphDiv, data, layout, { showSendToCloud: true });
+
+        graphDiv.on('plotly_relayout',
+            function (eventdata) {
+                alert('ZOOM!' + '\n\n' +
+                    'Event data:' + '\n' +
+                    JSON.stringify(eventdata) + '\n\n' +
+                    'x-axis start:' + eventdata['xaxis.range[0]'] + '\n' +
+                    'x-axis end:' + eventdata['xaxis.range[1]']);
+            });
+    });
+
+    function prepData(rawData) {
+        var x = [];
+        var y = [];
+
+        rawData.forEach(function (stock) {
+            x.push(new Date(stock.timestamp));
+            y.push(stock.close);
+        });
+
+        return [{
+            mode: 'lines',
+            x: x,
+            y: y
+        }];
+    }
+
+</script>
+
+</html>
