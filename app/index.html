@@ -13,8 +13,11 @@
     <div id="graph"></div>
 </body>
 
+<!-- TODO: now you would have x dollar -->
+
 <script src="./env.js"></script>
 <script>
+    const monthlyAmount = 100
     var graphDiv = document.getElementById('graph');
 
     var rawDataURL = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol=SPY&apikey=${API_KEY}&datatype=csv`;
@@ -48,7 +51,13 @@
     Plotly.d3.csv(rawDataURL, function (err, rawData) {
         if (err) throw err;
 
-        var data = prepData(rawData);
+        const allData = parseData(rawData);
+        let filteredData = allData
+
+        let dca = calcDCA(filteredData)
+        const numPoints = filteredData.length
+        let pltData = mkDataForPlot(filteredData)
+
         var layout = {
             title: 'Dollar cost averaging',
             xaxis: {
@@ -57,28 +66,44 @@
             },
             yaxis: {
                 fixedrange: true
-            }
+            },
+            shapes: [{
+                type: 'line',
+                x0: pltData[0].x[0].getTime(),
+                y0: dca.avgBuyPrice,
+                x1: pltData[0].x[numPoints - 1].getTime(),
+                y1: dca.avgBuyPrice,
+                line: {
+                    color: 'rgb(50, 171, 96)',
+                    width: 1,
+                    dash: 'dashdot'
+                }
+            }]
         };
 
-        Plotly.plot(graphDiv, data, layout, { showSendToCloud: true });
+        Plotly.plot(graphDiv, pltData, layout, { showSendToCloud: true });
 
         graphDiv.on('plotly_relayout',
             function (eventdata) {
-                alert('ZOOM!' + '\n\n' +
-                    'Event data:' + '\n' +
-                    JSON.stringify(eventdata) + '\n\n' +
-                    'x-axis start:' + eventdata['xaxis.range[0]'] + '\n' +
-                    'x-axis end:' + eventdata['xaxis.range[1]']);
+                const start = eventdata['xaxis.range[0]']
+                const end = eventdata['xaxis.range[1]']
+                if (start === undefined || end === undefined) return
+                
+                filteredData = filterData(allData, start, end)
+                console.log(filteredData.length)
             });
+
     });
 
-    function prepData(rawData) {
+
+
+    function mkDataForPlot(data) {
         var x = [];
         var y = [];
 
-        rawData.forEach(function (stock) {
-            x.push(new Date(stock.timestamp));
-            y.push(stock.close);
+        data.forEach(function (tick) {
+            x.push(tick.timestamp);
+            y.push(tick.close);
         });
 
         return [{
@@ -87,6 +112,32 @@
             y: y
         }];
     }
+
+    function filterData(data, start, end) {
+        return data.filter(tick => {
+            const ts = tick.timestamp.valueOf()
+            return start < ts && ts < end
+        })
+    }
+
+
+    function calcDCA(data, amount = 100) {
+        const totalInvested = data.length * amount
+        const numStocks = data.map(tick => amount / tick.close).reduce((a, b) => a + b)
+        const avgBuyPrice = totalInvested / numStocks
+
+        return {
+            totalInvested: totalInvested,
+            numStocks: numStocks,
+            avgBuyPrice: avgBuyPrice
+        }
+    }
+
+    function parseData(data) {
+        data.forEach((tick, idx) => data[idx].timestamp = new Date(tick.timestamp))
+        return data
+    }
+
 
 </script>
 
