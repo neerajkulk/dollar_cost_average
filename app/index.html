@@ -17,51 +17,74 @@
         integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
 </head>
 
-<div class="container">
-    <h1 class='my-3'>Dollar cost averaging</h1>
+<body>
+    <div class="container">
+        <h1 class='my-5'>Dollar cost averaging</h1>
 
-    <div class="row">
-        <div class="col-md-6">
-            <h6>Start Date </h6>
-            <input type="date" id="start" class="form-control" name="trip-start" value="2016-07-22" min="200-01-01"
-                max="2018-12-31">
-        </div>
-        <div class="col-md-6">
-            <h6>End Date </h6>
-            <input type="date" id="end" class="form-control" name="trip-start" value="2018-07-22">
-        </div>
-    </div>
-
-    <br>
-    <div class="row my-3">
-        <div class="col-md-6">
-            <h6>Monthly amount invested</h6>
-            <div class="input-group">
-                <span class="input-group-text">$</span>
-                <input id="monthlyAmount" type="text" class="form-control" aria-label="Amount (to the nearest dollar)"
-                    value="100" placeholder='Monthly amount invested'>
-
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Start Date </h6>
+                <input type="date" id="start" class="form-control" name="trip-start" value="2016-07-22" min="200-01-01"
+                    max="2018-12-31">
+            </div>
+            <div class="col-md-6">
+                <h6>End Date </h6>
+                <input type="date" id="end" class="form-control" name="trip-start" value="2018-07-22">
             </div>
         </div>
-        <div class="col-md-6">
-            <h6>Ticker </h6>
-            <input id="ticker" type="text" class="form-control" aria-label="Ticker Symbol" value="VOO">
+
+        <br>
+        <div class="row my-3">
+            <div class="col-md-6">
+                <h6>Monthly amount invested</h6>
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input id="monthlyAmount" type="text" class="form-control"
+                        aria-label="Amount (to the nearest dollar)" value="100" placeholder='Monthly amount invested'>
+
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Ticker </h6>
+                <input id="ticker" type="text" class="form-control" aria-label="Ticker Symbol" value="VOO">
+            </div>
         </div>
+
+        <button type="button" id='recalc' class="btn btn-primary my-3">Calculate dollar cost average</button>
+
+        <div id="error" class="alert alert-warning alert-dismissible fade show" hidden role="alert">
+            <strong>Whoops!</strong> Please recheck your input.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+    </div>
+    <div>
+        <div class='container-fluid' style="width: 100%" id="graph"></div>
     </div>
 
-
-    <button type="button" id='recalc' class="btn btn-primary my-3">Calculate dollar cost average</button>
-
-    <div id="error" class="alert alert-warning alert-dismissible fade show" hidden role="alert">
-        <strong>Whoops!</strong> Please recheck your input.
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <div class="container">
+        <table id="table" class="table table-striped" hidden>
+            <thead>
+                <tr>
+                    <th scope="col">Months Invested</th>
+                    <th scope="col">Total Invested</th>
+                    <th scope="col">Shares Owned</th>
+                    <th scope="col">Average Buy Price</th>
+                    <th scope="col">Value of Shares Today</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td id='months'></td>
+                    <td id="totalInvested"></td>
+                    <td id="sharesOwned"></td>
+                    <td id="avgBuyPrice"></td>
+                    <td id="valueToday"></td>
+                </tr>
+            </tbody>
+        </table>
     </div>
-
-    <body>
-        <div id="graph"></div>
-    </body>
-
-</div>
+</body>
 
 <!-- TODO: now you would have x dollar -->
 <!-- TICKER -->
@@ -71,6 +94,7 @@
     const graphDiv = document.getElementById('graph');
     const recalcBtn = document.getElementById('recalc');
     const errorElem = document.getElementById('error');
+    const table = document.getElementById('table');
 
     const userInputElements = {
         start: document.getElementById('start'),
@@ -107,6 +131,17 @@
         }],
     };
 
+    const layout = {
+        title: 'Dollar cost averaging',
+        xaxis: {
+            rangeselector: selectorOptions,
+            rangeslider: {}
+        },
+        yaxis: {
+            fixedrange: true
+        }
+    };
+
     mkPlot(userOptions)
 
     recalcBtn.addEventListener('click', () => {
@@ -114,6 +149,14 @@
         mkPlot(userOptions)
     })
 
+    function updateStats(dca) {
+        document.getElementById('months').innerText = dca.months
+        document.getElementById('totalInvested').innerText = `$${dca.totalInvested}`
+        document.getElementById('sharesOwned').innerText = round(dca.numStocks)
+        document.getElementById('avgBuyPrice').innerText = `$${round(dca.avgBuyPrice)}`
+        document.getElementById('valueToday').innerText = `$${round(dca.valueToday)}`
+        table.hidden = false
+    }
 
     function parseUserInput(userInputElements) {
         return {
@@ -136,8 +179,7 @@
         const url = getURL(userOptions)
         Plotly.d3.csv(url, (err, rawData) => {
             if (err) throw err;
-            if (!requestIsValid(rawData)){
-                console.log('yo')
+            if (!requestIsValid(rawData)) {
                 errorElem.hidden = false
                 return
             }
@@ -145,41 +187,18 @@
             errorElem.hidden = true
             const allData = parseRawData(rawData);
             const filteredData = filterData(allData, userOptions.start, userOptions.end)
-            const dca = calcDCA(filteredData, userOptions.monthlyAmount)
-            const pltData = formatDataForPlot(filteredData)
-            const layout = setLayout(filteredData, dca, userOptions)
+            const currentPrice = allData[0].close
+            const dca = calcDCA(filteredData, userOptions.monthlyAmount, currentPrice)
+            updateStats(dca)
+            const pltData = formatDataForPlot(filteredData, dca, userOptions)
 
             Plotly.newPlot(graphDiv, pltData, layout, { showSendToCloud: true });
         })
     }
 
-    function setLayout(filteredData, dca, userOptions) {
-        return layout = {
-            title: 'Dollar cost averaging',
-            xaxis: {
-                rangeselector: selectorOptions,
-                rangeslider: {}
-            },
-            yaxis: {
-                fixedrange: true
-            },
-            shapes: [{
-                type: 'line',
-                x0: userOptions.start.valueOf(),
-                y0: dca.avgBuyPrice,
-                x1: userOptions.end.valueOf(),
-                y1: dca.avgBuyPrice,
-                line: {
-                    color: 'rgb(50, 171, 96)',
-                    width: 1,
-                    dash: 'dashdot'
-                }
-            }]
-        };
 
-    }
 
-    function formatDataForPlot(data) {
+    function formatDataForPlot(data, dca, userOptions) {
         var x = [];
         var y = [];
 
@@ -188,11 +207,26 @@
             y.push(tick.close);
         });
 
-        return [{
+        const dcaLine = {
             mode: 'lines',
+            name: `Average buy price $${round(dca.avgBuyPrice)}`,
+            showLegend: true,
+            x: [userOptions.start.valueOf(), userOptions.end.valueOf()],
+            y: [dca.avgBuyPrice, dca.avgBuyPrice],
+            line: {
+                width: 2,
+                dash: 'dashdot'
+            }
+        }
+
+        const stockPrice = {
+            mode: 'lines',
+            name: 'Monthly closing price',
+            showLegend: true,
             x: x,
             y: y
-        }];
+        }
+        return [stockPrice, dcaLine];
     }
 
     function filterData(data, start, end) {
@@ -203,15 +237,17 @@
     }
 
 
-    function calcDCA(data, amount = monthlyAmount) {
-        const totalInvested = data.length * amount
-        const numStocks = data.map(tick => amount / tick.close).reduce((a, b) => a + b)
+    function calcDCA(filteredData, amount, currentPrice) {
+        const totalInvested = filteredData.length * amount
+        const numStocks = filteredData.map(tick => amount / tick.close).reduce((a, b) => a + b)
         const avgBuyPrice = totalInvested / numStocks
-
+        const valueToday = currentPrice * numStocks
         return {
+            months: filteredData.length,
             totalInvested: totalInvested,
             numStocks: numStocks,
-            avgBuyPrice: avgBuyPrice
+            avgBuyPrice: avgBuyPrice,
+            valueToday: valueToday
         }
     }
 
@@ -220,6 +256,10 @@
         return data
     }
 
+
+    function round(num) {
+        return Math.round(num * 100) / 100
+    }
 
 </script>
 
