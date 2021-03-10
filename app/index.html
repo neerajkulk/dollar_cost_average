@@ -20,7 +20,7 @@
     const monthlyAmount = 100
     var graphDiv = document.getElementById('graph');
 
-    var rawDataURL = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol=SPY&apikey=${API_KEY}&datatype=csv`;
+    var rawDataURL = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol=TSLA&apikey=${API_KEY}&datatype=csv`;
 
     var selectorOptions = {
         buttons: [{
@@ -53,12 +53,36 @@
 
         const allData = parseData(rawData);
         let filteredData = allData
-
-        let dca = calcDCA(filteredData)
-        const numPoints = filteredData.length
+        let dca = calcDCA(filteredData, monthlyAmount)
+        let layout = setLayout(filteredData, dca)
         let pltData = mkDataForPlot(filteredData)
+        Plotly.plot(graphDiv, pltData, layout, { showSendToCloud: true });
 
-        var layout = {
+        graphDiv.on('plotly_relayout',
+            function (eventdata) {
+                const start = eventdata['xaxis.range[0]']
+                const end = eventdata['xaxis.range[1]']
+                if (start === undefined || end === undefined) return
+
+                filteredData = filterData(allData, start, end)
+                dca = calcDCA(filteredData, monthlyAmount)
+                layout = setLayout(filteredData, dca)
+                Plotly.newPlot(graphDiv, pltData, layout, { showSendToCloud: true });
+
+            });
+
+    });
+
+    function getRange(data) {
+        return {
+            start: data[0].timestamp.valueOf(),
+            end: data[data.length - 1].timestamp.valueOf()
+        }
+    }
+
+    function setLayout(filteredData, dca) {
+        const { start, end } = getRange(filteredData)
+        return layout = {
             title: 'Dollar cost averaging',
             xaxis: {
                 rangeselector: selectorOptions,
@@ -69,9 +93,9 @@
             },
             shapes: [{
                 type: 'line',
-                x0: pltData[0].x[0].getTime(),
+                x0: start,
                 y0: dca.avgBuyPrice,
-                x1: pltData[0].x[numPoints - 1].getTime(),
+                x1: end,
                 y1: dca.avgBuyPrice,
                 line: {
                     color: 'rgb(50, 171, 96)',
@@ -81,20 +105,7 @@
             }]
         };
 
-        Plotly.plot(graphDiv, pltData, layout, { showSendToCloud: true });
-
-        graphDiv.on('plotly_relayout',
-            function (eventdata) {
-                const start = eventdata['xaxis.range[0]']
-                const end = eventdata['xaxis.range[1]']
-                if (start === undefined || end === undefined) return
-                
-                filteredData = filterData(allData, start, end)
-                console.log(filteredData.length)
-            });
-
-    });
-
+    }
 
 
     function mkDataForPlot(data) {
@@ -121,7 +132,7 @@
     }
 
 
-    function calcDCA(data, amount = 100) {
+    function calcDCA(data, amount = monthlyAmount) {
         const totalInvested = data.length * amount
         const numStocks = data.map(tick => amount / tick.close).reduce((a, b) => a + b)
         const avgBuyPrice = totalInvested / numStocks
