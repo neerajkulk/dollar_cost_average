@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 
+<style>
+    .hidden {
+        display: hidden;
+    }
+</style>
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -12,29 +18,44 @@
 </head>
 
 <div class="container">
-    <h1>Dollar cost averaging</h1>
+    <h1 class='my-3'>Dollar cost averaging</h1>
 
-    Start Date
-    <input type="date" id="start" name="trip-start" value="2016-07-22" min="200-01-01" max="2018-12-31">
-
-    End Date
-    <input type="date" id="end" name="trip-start" value="2018-07-22">
+    <div class="row">
+        <div class="col-md-6">
+            <h6>Start Date </h6>
+            <input type="date" id="start" class="form-control" name="trip-start" value="2016-07-22" min="200-01-01"
+                max="2018-12-31">
+        </div>
+        <div class="col-md-6">
+            <h6>End Date </h6>
+            <input type="date" id="end" class="form-control" name="trip-start" value="2018-07-22">
+        </div>
+    </div>
 
     <br>
+    <div class="row my-3">
+        <div class="col-md-6">
+            <h6>Monthly amount invested</h6>
+            <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input id="monthlyAmount" type="text" class="form-control" aria-label="Amount (to the nearest dollar)"
+                    value="100" placeholder='Monthly amount invested'>
 
-    <div class="input-group mb-3">
-        Monthly investment
-        <span class="input-group-text">$</span>
-        <input id="monthlyAmount" type="text" class="form-control" aria-label="Amount (to the nearest dollar)"
-            value="100">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h6>Ticker </h6>
+            <input id="ticker" type="text" class="form-control" aria-label="Ticker Symbol" value="VOO">
+        </div>
     </div>
 
-    <div class="input-group mb-3">
-        Ticker
-        <input id="ticker" type="text" class="form-control" aria-label="Ticker Symbol" value="VOO">
-    </div>
 
-    <button type="button" id='recalc' class="btn btn-primary">Calculate dollar cost average</button>
+    <button type="button" id='recalc' class="btn btn-primary my-3">Calculate dollar cost average</button>
+
+    <div id="error" class="alert alert-warning alert-dismissible fade show" hidden role="alert">
+        <strong>Whoops!</strong> Please recheck your input.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 
     <body>
         <div id="graph"></div>
@@ -49,7 +70,7 @@
 <script>
     const graphDiv = document.getElementById('graph');
     const recalcBtn = document.getElementById('recalc');
-
+    const errorElem = document.getElementById('error');
 
     const userInputElements = {
         start: document.getElementById('start'),
@@ -107,11 +128,21 @@
         return `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol=${userOptions.ticker}&apikey=${API_KEY}&datatype=csv`;
     }
 
+    function requestIsValid(rawData) {
+        return rawData.length > 0 && rawData[0]['{'] === undefined
+    }
+
     function mkPlot(userOptions) {
         const url = getURL(userOptions)
         Plotly.d3.csv(url, (err, rawData) => {
             if (err) throw err;
+            if (!requestIsValid(rawData)){
+                console.log('yo')
+                errorElem.hidden = false
+                return
+            }
 
+            errorElem.hidden = true
             const allData = parseRawData(rawData);
             const filteredData = filterData(allData, userOptions.start, userOptions.end)
             const dca = calcDCA(filteredData, userOptions.monthlyAmount)
