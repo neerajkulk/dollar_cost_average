@@ -51,27 +51,32 @@
     Plotly.d3.csv(rawDataURL, function (err, rawData) {
         if (err) throw err;
 
-        const allData = parseData(rawData);
-        let filteredData = allData
-        let dca = calcDCA(filteredData, monthlyAmount)
-        let layout = setLayout(filteredData, dca)
-        let pltData = mkDataForPlot(filteredData)
+        const allData = parseRawData(rawData);
+        const { pltData, layout } = mkPlotData(allData, 0, Infinity)
+        
         Plotly.plot(graphDiv, pltData, layout, { showSendToCloud: true });
 
         graphDiv.on('plotly_relayout',
             function (eventdata) {
                 const start = eventdata['xaxis.range[0]']
                 const end = eventdata['xaxis.range[1]']
+        
                 if (start === undefined || end === undefined) return
-
-                filteredData = filterData(allData, start, end)
-                dca = calcDCA(filteredData, monthlyAmount)
-                layout = setLayout(filteredData, dca)
+        
+                const { pltData, layout } = mkPlotData(allData, start, end)
                 Plotly.newPlot(graphDiv, pltData, layout, { showSendToCloud: true });
 
             });
-
     });
+
+    function mkPlotData(allData, start, end) {
+        const filteredData = filterData(allData, start, end)
+        const dca = calcDCA(filteredData, monthlyAmount)
+        return {
+            pltData: formatDataForPlot(filteredData),
+            layout: setLayout(filteredData, dca)
+        }
+    }
 
     function getRange(data) {
         return {
@@ -108,7 +113,7 @@
     }
 
 
-    function mkDataForPlot(data) {
+    function formatDataForPlot(data) {
         var x = [];
         var y = [];
 
@@ -144,7 +149,7 @@
         }
     }
 
-    function parseData(data) {
+    function parseRawData(data) {
         data.forEach((tick, idx) => data[idx].timestamp = new Date(tick.timestamp))
         return data
     }
