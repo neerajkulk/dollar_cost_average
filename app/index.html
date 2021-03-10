@@ -7,22 +7,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dollar Cost Averaging</title>
     <script src="https://cdn.plot.ly/plotly-1.8.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
 </head>
 
-<body>
-    <div id="graph"></div>
-</body>
+<div class="container">
+    <h1>Dollar cost averaging</h1>
+
+    Start Date
+    <input type="date" id="start" name="trip-start" value="2016-07-22" min="200-01-01" max="2018-12-31">
+
+    End Date
+    <input type="date" id="end" name="trip-start" value="2018-07-22">
+
+    <br>
+
+    <div class="input-group mb-3">
+        Monthly investment
+        <span class="input-group-text">$</span>
+        <input id="monthlyAmount" type="text" class="form-control" aria-label="Amount (to the nearest dollar)"
+            value="100">
+    </div>
+
+    <div class="input-group mb-3">
+        Ticker
+        <input id="ticker" type="text" class="form-control" aria-label="Ticker Symbol" value="VOO">
+    </div>
+
+    <button type="button" id='recalc' class="btn btn-primary">Calculate dollar cost average</button>
+
+    <body>
+        <div id="graph"></div>
+    </body>
+
+</div>
 
 <!-- TODO: now you would have x dollar -->
+<!-- TICKER -->
 
 <script src="./env.js"></script>
 <script>
-    const monthlyAmount = 100
-    var graphDiv = document.getElementById('graph');
+    const graphDiv = document.getElementById('graph');
+    const recalcBtn = document.getElementById('recalc');
 
-    var rawDataURL = `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol=TSLA&apikey=${API_KEY}&datatype=csv`;
 
-    var selectorOptions = {
+    const userInputElements = {
+        start: document.getElementById('start'),
+        end: document.getElementById('end'),
+        monthlyAmount: document.getElementById('monthlyAmount'),
+        ticker: document.getElementById('ticker')
+    }
+
+    const userOptions = parseUserInput(userInputElements)
+
+    const selectorOptions = {
         buttons: [{
             step: 'month',
             stepmode: 'backward',
@@ -48,45 +86,43 @@
         }],
     };
 
-    Plotly.d3.csv(rawDataURL, function (err, rawData) {
-        if (err) throw err;
+    mkPlot(userOptions)
 
-        const allData = parseRawData(rawData);
-        const { pltData, layout } = mkPlotData(allData, 0, Infinity)
-        
-        Plotly.plot(graphDiv, pltData, layout, { showSendToCloud: true });
+    recalcBtn.addEventListener('click', () => {
+        const userOptions = parseUserInput(userInputElements)
+        mkPlot(userOptions)
+    })
 
-        graphDiv.on('plotly_relayout',
-            function (eventdata) {
-                const start = eventdata['xaxis.range[0]']
-                const end = eventdata['xaxis.range[1]']
-        
-                if (start === undefined || end === undefined) return
-        
-                const { pltData, layout } = mkPlotData(allData, start, end)
-                Plotly.newPlot(graphDiv, pltData, layout, { showSendToCloud: true });
 
-            });
-    });
-
-    function mkPlotData(allData, start, end) {
-        const filteredData = filterData(allData, start, end)
-        const dca = calcDCA(filteredData, monthlyAmount)
+    function parseUserInput(userInputElements) {
         return {
-            pltData: formatDataForPlot(filteredData),
-            layout: setLayout(filteredData, dca)
+            start: new Date(userInputElements.start.value),
+            end: new Date(userInputElements.end.value),
+            monthlyAmount: parseFloat(userInputElements.monthlyAmount.value),
+            ticker: userInputElements.ticker.value.toUpperCase()
         }
     }
 
-    function getRange(data) {
-        return {
-            start: data[0].timestamp.valueOf(),
-            end: data[data.length - 1].timestamp.valueOf()
-        }
+    function getURL(userOptions) {
+        return `https://www.alphavantage.co/query?function=TIME_SERIES_MONTHLY&symbol=${userOptions.ticker}&apikey=${API_KEY}&datatype=csv`;
     }
 
-    function setLayout(filteredData, dca) {
-        const { start, end } = getRange(filteredData)
+    function mkPlot(userOptions) {
+        const url = getURL(userOptions)
+        Plotly.d3.csv(url, (err, rawData) => {
+            if (err) throw err;
+
+            const allData = parseRawData(rawData);
+            const filteredData = filterData(allData, userOptions.start, userOptions.end)
+            const dca = calcDCA(filteredData, userOptions.monthlyAmount)
+            const pltData = formatDataForPlot(filteredData)
+            const layout = setLayout(filteredData, dca, userOptions)
+
+            Plotly.newPlot(graphDiv, pltData, layout, { showSendToCloud: true });
+        })
+    }
+
+    function setLayout(filteredData, dca, userOptions) {
         return layout = {
             title: 'Dollar cost averaging',
             xaxis: {
@@ -98,9 +134,9 @@
             },
             shapes: [{
                 type: 'line',
-                x0: start,
+                x0: userOptions.start.valueOf(),
                 y0: dca.avgBuyPrice,
-                x1: end,
+                x1: userOptions.end.valueOf(),
                 y1: dca.avgBuyPrice,
                 line: {
                     color: 'rgb(50, 171, 96)',
@@ -111,7 +147,6 @@
         };
 
     }
-
 
     function formatDataForPlot(data) {
         var x = [];
