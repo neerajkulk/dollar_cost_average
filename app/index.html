@@ -24,7 +24,7 @@
         <div class="row">
             <div class="col-md-6">
                 <h6>Start Date </h6>
-                <input type="date" id="start" class="form-control" name="trip-start" value="2016-07-22" max="2000-1-1">
+                <input type="date" id="start" class="form-control" name="trip-start" value="2016-07-22" min="2000-1-1">
             </div>
             <div class="col-md-6">
                 <h6>End Date </h6>
@@ -49,7 +49,7 @@
             </div>
         </div>
 
-        <button type="button" id='recalc' class="btn btn-primary my-3">Calculate dollar cost average</button>
+        <button type="button" id='recalc' class="btn btn-success my-3">Calculate</button>
 
         <div id="error" class="alert alert-warning alert-dismissible fade show" hidden role="alert">
             <strong>Whoops!</strong> Please recheck your input.
@@ -57,7 +57,7 @@
         </div>
 
     </div>
-    
+
     <div class='container-fluid' style="width: 100%" id="graph"></div>
 
     <div class="container">
@@ -93,10 +93,7 @@
     const recalcBtn = document.getElementById('recalc');
     const errorElem = document.getElementById('error');
     const table = document.getElementById('table');
-
-
-    document.getElementById('end').valueAsDate = new Date();
-
+    setDateRange()
 
     const userInputElements = {
         start: document.getElementById('start'),
@@ -150,6 +147,29 @@
         const userOptions = parseUserInput(userInputElements)
         mkPlot(userOptions)
     })
+
+
+    function formatDate(date) {
+        return date.toISOString().split('T')[0]
+
+    }
+
+    function setDateRange() {
+        const end = document.getElementById('end')
+        const start = document.getElementById('start')
+
+        const today = new Date();
+        end.value = formatDate(today)
+        end.setAttribute('max', formatDate(today))
+        end.setAttribute('min', '2000-10-01')
+
+        const twoMonthsAgo = new Date(Date.now() - 2629800000)
+        start.value = '2018-01-01'
+        start.setAttribute('max', formatDate(twoMonthsAgo))
+        start.setAttribute('min', '2000-01-01')
+    }
+
+
 
     function updateStats(dca) {
         document.getElementById('months').innerText = dca.months
