@@ -49,7 +49,12 @@
             </div>
         </div>
 
-        <button type="button" id='recalc' class="btn btn-success my-3">Calculate</button>
+        <div class="my-3">
+            <button id="recalc" class="btn btn-success" type="button">
+                Calculate
+                <span id="spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" hidden></span>
+            </button>
+        </div>
 
         <div id="error" class="alert alert-warning alert-dismissible fade show" hidden role="alert">
             <strong>Whoops!</strong> Please recheck your input.
@@ -84,8 +89,6 @@
     </div>
 </body>
 
-<!-- TODO: now you would have x dollar -->
-<!-- TICKER -->
 
 <script src="./env.js"></script>
 <script>
@@ -144,10 +147,12 @@
     mkPlot(userOptions)
 
     recalcBtn.addEventListener('click', () => {
+        document.getElementById('spinner').hidden = false
         const userOptions = parseUserInput(userInputElements)
         mkPlot(userOptions)
     })
 
+    // Helper functions
 
     function formatDate(date) {
         return date.toISOString().split('T')[0]
@@ -174,7 +179,7 @@
     function updateStats(dca) {
         document.getElementById('months').innerText = dca.months
         document.getElementById('totalInvested').innerText = `$${dca.totalInvested}`
-        document.getElementById('sharesOwned').innerText = round(dca.numStocks)
+        document.getElementById('sharesOwned').innerText = round(dca.sharesOwned)
         document.getElementById('avgBuyPrice').innerText = `$${round(dca.avgBuyPrice)}`
         document.getElementById('valueToday').innerText = `$${round(dca.valueToday)}`
         table.hidden = false
@@ -202,6 +207,7 @@
         Plotly.d3.csv(url, (err, rawData) => {
             if (err) throw err;
             if (!requestIsValid(rawData)) {
+                console.log(rawData)
                 errorElem.hidden = false
                 return
             }
@@ -215,6 +221,7 @@
             const pltData = formatDataForPlot(filteredData, dca, userOptions)
 
             Plotly.newPlot(graphDiv, pltData, layout, { showSendToCloud: true });
+            document.getElementById('spinner').hidden = true
         })
     }
 
@@ -261,13 +268,13 @@
 
     function calcDCA(filteredData, amount, currentPrice) {
         const totalInvested = filteredData.length * amount
-        const numStocks = filteredData.map(tick => amount / tick.close).reduce((a, b) => a + b)
-        const avgBuyPrice = totalInvested / numStocks
-        const valueToday = currentPrice * numStocks
+        const sharesOwned = filteredData.map(tick => amount / tick.close).reduce((a, b) => a + b)
+        const avgBuyPrice = totalInvested / sharesOwned
+        const valueToday = currentPrice * sharesOwned
         return {
             months: filteredData.length,
             totalInvested: totalInvested,
-            numStocks: numStocks,
+            sharesOwned: sharesOwned,
             avgBuyPrice: avgBuyPrice,
             valueToday: valueToday
         }
